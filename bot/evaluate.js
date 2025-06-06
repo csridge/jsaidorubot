@@ -103,6 +103,6 @@ export function evaluate(board){
             black += val;
         }
     }
-    document.querySelector('#eval').textContent=white-black
+    document.querySelector('#eval').textContent=`${white-black}`
     return white - black;
 }
