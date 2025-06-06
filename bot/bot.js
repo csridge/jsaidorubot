@@ -9,7 +9,7 @@ function minimax(game, depth, isMaximizing) {
     return evaluate(game);
   }
 
-  const moves = game.moves();
+  const moves = game.moves({verbose: true});
   if (isMaximizing) {
     let bestEval = -Infinity;
     for (let move of moves) {
