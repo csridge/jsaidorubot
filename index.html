@@ -1,0 +1,17 @@
+<html>
+    <head>
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+        <script src="./lib/chessboard-1.0.0.min.js"></script>
+        <link rel="stylesheet" href="./lib/chessboard-1.0.0.min.css">
+    </head>
+    <body>
+        <div id="board" style="width: 400px"></div>
+        <button id="startBtn">Start Position</button>
+        <button id="clearBtn">Clear Board</button>
+        <div id="pgn"></div>
+        <div id="fen"></div>
+        <div id="eval"></div>
+        <script type="module" src="./board.js"></script>
+        <script type="module" src="./bot/bot.js"></script>
+        <script type="module" src="./bot/evaluate.js"></script>
+</html>
