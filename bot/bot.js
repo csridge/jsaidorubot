@@ -36,7 +36,7 @@ export function findBestMove(game) {
   let best_eval = -Infinity;
   for (let move of moves) {
     game.move(move);
-    let evaluation = minimax(game, 2, false);
+    let evaluation = minimax(game, 3, false);
     game.undo();
     if (evaluation > best_eval) {
       best_eval = evaluation;
