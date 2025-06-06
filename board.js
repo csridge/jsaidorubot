@@ -5,6 +5,7 @@ const game = new Chess();
 const board = Chessboard('board', {
   draggable: true,
   position: 'start',
+  animation: false,
   onDragStart: (source, piece, position, orientation) => {
     if (game.isGameOver()) return false;
     // Only allow dragging of white pieces
