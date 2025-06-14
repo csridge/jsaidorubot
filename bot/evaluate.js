@@ -1,3 +1,4 @@
+import { Chess } from 'https://esm.sh/chess.js';
 console.log('evaluate.js loaded');
 const piece_vals = {
     'p': 100, // pawn
@@ -7,7 +8,7 @@ const piece_vals = {
     'q': 900, // queen
     'k': 69420  // king
 }
-function mirrorPST(pst) {
+function mirrorPST(pst) { // can also works for the chessboard i think
   const mirrored = [];
   for (let rank = 7; rank >= 0; rank--) {
     const row = pst.slice(rank * 8, (rank + 1) * 8);
@@ -78,7 +79,7 @@ export const psts = {
  20, 30, 10,  0,  0, 10, 30, 20
 ])
 }
-const SQUARES = [
+const SQUARES = mirrorPST([
     'a8', 'b8', 'c8', 'd8', 'e8', 'f8', 'g8', 'h8',
     'a7', 'b7', 'c7', 'd7', 'e7', 'f7', 'g7', 'h7',
     'a6', 'b6', 'c6', 'd6', 'e6', 'f6', 'g6', 'h6',
@@ -86,31 +87,38 @@ const SQUARES = [
     'a4', 'b4', 'c4', 'd4', 'e4', 'f4', 'g4', 'h4',
     'a3', 'b3', 'c3', 'd3', 'e3', 'f3', 'g3', 'h3',
     'a2', 'b2', 'c2', 'd2', 'e2', 'f2', 'g2', 'h2',
-    'a1', 'b1', 'c1', 'd1', 'e1', 'f1', 'g1', 'h1'
-    // thanks ai for writing every square for me
-]
-export function evaluate(board){
-    let white = 0;
-    let black = 0;
-    for (let idx = 0; idx < SQUARES.length; idx++) {
-        let square = SQUARES[idx];
-        let piece = board.get(square);
-        if (!piece) continue; // skip empty squares
-        let index;
-        if (piece.color === 'w') {
-            index = idx; // white pieces use the index as is
-        } else {
-            index = 63 - idx; // black pieces are mirrored
-        }
-        let val = piece_vals[piece.type] + psts[piece.type][index];
+    'a1', 'b1', 'c1', 'd1', 'e1', 'f1', 'g1', 'h1'])
 
-        if (piece.color === 'w'){
-            white += val;
-        }
-        else if (piece.color === 'b'){
-            black += val;
-        }
+export function evaluate(board) {
+  let white = 0;
+  let black = 0;
+
+  const counts = {
+    w: { p: 0, n: 0, b: 0, r: 0, q: 0, k: 0 },
+    b: { p: 0, n: 0, b: 0, r: 0, q: 0, k: 0 }
+  };
+
+  for (let idx = 0; idx < SQUARES.length; idx++) {
+    let square = SQUARES[idx];
+    let piece = board.get(square);
+    if (!piece) continue;
+
+    counts[piece.color][piece.type]++;
+
+    let index = piece.color === 'w' ? idx : 63 - idx;
+    // castling bonus
+    if (board.get('g8')?.type === 'k' && board.get('f8')?.type === 'r') {
+      black += 30; // black castled short
     }
-    document.querySelector('#eval').textContent=`Eval: ${white-black}`
-    return white - black;
+    if (board.get('c8')?.type === 'k' && board.get('d8')?.type === 'r') {
+      black += 30; // black castled long
+    }
+
+    let val = piece_vals[piece.type] + psts[piece.type][index]
+
+    if (piece.color === 'w') white += val;
+    else black += val;
+  }
+
+  return board.turn() === 'w' ? white - black : black - white;
 }

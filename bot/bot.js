@@ -4,7 +4,7 @@ import { evaluate } from './evaluate.js';
 const chess = new Chess()
 let posEvaluated = 0; // Keep this global
 // presorting moves
-function sortMove(move) {
+function sortMove(moves) {
   const pieceValues = { // idk why i need 2
     'p': 100, // pawn
     'n': 320, // knight
@@ -16,89 +16,84 @@ function sortMove(move) {
   let score = 0;
 
   // Promotion bonus
-  if (move.promotion) {
-    score += pieceValues[move.promotion] || 0;
+  if (moves.promotion) {
+    score += pieceValues[moves.promotion] || 0;
   }
 
   // MVV-LVA (Most Valuable Victim - Least Valuable Attacker)
-  if (move.captured) {
-    const capturedPiece = pieceValues[move.captured];
-    const capturingPiece = pieceValues[move.piece];
+  if (moves.captured) {
+    const capturedPiece = pieceValues[moves.captured];
+    const capturingPiece = pieceValues[moves.piece];
     score += 10 * capturedPiece - capturingPiece;
   }
 
-  // Checks
-  if (move.flags.includes('c')) score += 50; // check
-  if (move.flags.includes('k')) score += 20; // kingside castling
-  if (move.flags.includes('q')) score += 20; // queenside castling
+  if (moves.flags.includes('c')) score += 50; // check
+  if (moves.flags.includes('k')) score += 20; // kingside castling
+  if (moves.flags.includes('q')) score += 20; // queenside castling
 
   return score;
 }
-function quiescenceSearch(chess, alpha, beta, isMaximizingPlayer) {
-    const standPat = evaluate(chess);
+function quiescenceSearch(game, alpha, beta, depth = 5) {
+  if (depth <= 0 || game.isGameOver()) return evaluate(game);
+  const standPat = evaluate(game);
 
-    if (isMaximizingPlayer) {
-        if (standPat >= beta) return beta;
-        if (alpha < standPat) alpha = standPat;
-    } else {
-        if (standPat <= alpha) return alpha;
-        if (beta > standPat) beta = standPat;
-    }
+  if (standPat >= beta) return beta;
+  if (standPat > alpha) alpha = standPat;
 
-    const captureMoves = chess.moves({ verbose: true }).filter(
-        move => move.flags.includes('c') || move.flags.includes('e') // captures and en passant
-    );
+  const captures = game.moves({ verbose: true }).filter(
+    move => move.flags.includes('c') || move.flags.includes('e') || move.san.includes('+')
+  );
 
-    for (const move of captureMoves) {
-        chess.move(move);
-        const score = -quiescenceSearch(chess, alpha, beta, !isMaximizingPlayer);
-        chess.undo();
+  for (const move of captures) {
+    game.move(move);
+    const score = -quiescenceSearch(game, -beta, -alpha, depth - 1);
+    game.undo();
 
-        if (isMaximizingPlayer) {
-            if (score >= beta) return beta;
-            if (score > alpha) alpha = score;
-        } else {
-            if (score <= alpha) return alpha;
-            if (score < beta) beta = score;
-        }
-    }
+    if (score >= beta) return beta;
+    if (score > alpha) alpha = score;
+  }
 
-
-    return isMaximizingPlayer ? alpha : beta;
+  return alpha;
+}
+// transposition table helper func
+function getTranspositionKey(game) {
+  return game.fen(); // using FEN as a key
 }
 
-// minmax + alpha-beta pruning + sorting moves
-function minimax(game, depth, isMaximizing, alpha = -Infinity, beta = Infinity) {
+// negamax + alpha-beta pruning + sorting moves
+const transpositionTable = new Map();
+function negamax(game, depth, alpha=-Infinity, beta=Infinity) {
+  const key = getTranspositionKey(game);
+  if (transpositionTable.has(key)) { // if position is evaluated b4
+    const entry = transpositionTable.get(key);
+    if (entry.depth >= depth) {
+      posEvaluated++;
+      return entry.evaluation; // return cached eval
+    }
+  }
   if (depth === 0 || game.isGameOver()) {
-    posEvaluated++;
-    return quiescenceSearch(game, alpha, beta, isMaximizing);
+    const evaluation = quiescenceSearch(game, alpha, beta);
+    transpositionTable.set(key, { evaluation: evaluation, depth });
+    return evaluation
   }
-  const moves = game.moves({verbose: true});
+
+  let maxEval = -Infinity;
+  const moves = game.moves({ verbose: true });
   const sortedMoves = moves.sort((a, b) => sortMove(b) - sortMove(a));
-  if (isMaximizing) {
-    let bestEval = -Infinity;
-    for (let move of sortedMoves) {
-      game.move(move);
-      const evaluation = minimax(game, depth - 1, false, alpha, beta);
-      game.undo();
-      bestEval = Math.max(bestEval, evaluation);
-      alpha = Math.max(alpha, evaluation);
-      if (beta <= alpha) break;
-    }
-    return bestEval;
-  } else {
-    let bestEval = Infinity;
-    for (let move of sortedMoves) {
-      game.move(move);
-      const evaluation = minimax(game, depth - 1, true, alpha, beta);
-      game.undo();
-      bestEval = Math.min(bestEval, evaluation);
-      beta = Math.min(beta, evaluation);
-      if (beta <= alpha) break;
-    }
-    return bestEval;
+  for (const move of sortedMoves) {
+    game.move(move);
+    posEvaluated++;
+    const evaluation = -negamax(game, depth - 1, -beta, -alpha);
+    game.undo();
+
+    maxEval = Math.max(maxEval, evaluation);
+    alpha = Math.max(alpha, evaluation);
+    if (alpha >= beta) break;
   }
+  transpositionTable.set(key, { eval: maxEval, depth });
+  return maxEval;
 }
+
 
 // finding best move
 export function findBestMove(game) {
@@ -113,7 +108,7 @@ export function findBestMove(game) {
   
   for (let move of moves) {
     game.move(move);
-    let evaluation = minimax(game, 0, game.turn() === 'b'); // second param is depth
+    let evaluation = negamax(game, 2, -1); // second param is depth
     game.undo();
     
     console.log(`Evaluation of ${move.san}: ${evaluation}`);
@@ -126,15 +121,14 @@ export function findBestMove(game) {
   }
   
   const timeElapsed = performance.now() - startTime;
-  const speed = timeElapsed > 0 ? Math.round(posEvaluated / timeElapsed) : posEvaluated;
+  const speed = timeElapsed > 0 ? Math.round(posEvaluated / (timeElapsed/1000)) : posEvaluated;
   // debugging info
-  console.log(`Evaluated ${posEvaluated} positions in ${timeElapsed}ms`);
-  console.log(`${Math.round(posEvaluated / (timeElapsed / 1000))} positions/second`);
   document.querySelector('#positions').textContent = `Positions evaluated: ${posEvaluated}`;
-  document.querySelector('#time').textContent = `Time: ${timeElapsed}ms`;
+  document.querySelector('#time').textContent = `Time: ${timeElapsed.toFixed(2)}ms`;
   document.querySelector('#speed').textContent = `Speed: ${speed.toLocaleString()} pos/sec`;
   
   console.log(`Evaluated ${posEvaluated} positions in ${timeElapsed}ms (${speed} pos/sec)`);
+  document.querySelector('#eval').textContent = `Eval: ${bestEval}`;
   return bestMove;
 }
 export function makeMove(game, board) {

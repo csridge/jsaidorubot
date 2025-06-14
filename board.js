@@ -1,11 +1,11 @@
 import { Chess } from 'https://esm.sh/chess.js';
 import { makeMove } from './bot/bot.js';
 const fen = 'r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1' // debug purpose only
-const game = new Chess('r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1');
+const game = new Chess();
 // chessboard
 const board = Chessboard('board', {
   draggable: true,
-  position: fen,
+  position: 'start',
   animation: 0,
   onDragStart: (source, piece, position, orientation) => {
     if (game.isGameOver()) return false;
