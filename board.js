@@ -1,19 +1,19 @@
 import { Chess } from 'https://esm.sh/chess.js';
 import { makeMove } from './bot/bot.js';
 const fen = 'r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1' // debug purpose only
-const game = new Chess();
+const chess = new Chess();
 // chessboard
 const board = Chessboard('board', {
   draggable: true,
   position: 'start',
   animation: 0,
   onDragStart: (source, piece, position, orientation) => {
-    if (game.isGameOver()) return false;
+    if (chess.isGameOver()) return false;
     // Only allow dragging of white pieces
     if (piece.search(/^b/) !== -1) return false;
   },
   onDrop: (source, target) => {
-    const piece = game.get(source);
+    const piece = chess.get(source);
     let moveConfig = { from: source, to: target };
     if (
       piece &&
@@ -25,7 +25,7 @@ const board = Chessboard('board', {
     }
     let move;
     try {
-        move = game.move(moveConfig);
+        move = chess.move(moveConfig);
     } catch (e) {
         console.error("Invalid move:", moveConfig, e);
         return 'snapback';
@@ -33,17 +33,17 @@ const board = Chessboard('board', {
     if (!move) return 'snapback';
 
     // Update board and info after a legal move
-    board.position(game.fen());
-    document.querySelector('#fen').innerText = game.fen();
-    document.querySelector('#pgn').innerText = game.pgn();
+    board.position(chess.fen());
+    document.querySelector('#fen').innerText = chess.fen();
+    document.querySelector('#pgn').innerText = chess.pgn();
 
-    if (!game.isGameOver()) {
-        window.setTimeout(() => makeMove(game, board), 250);
+    if (!chess.isGameOver()) {
+        window.setTimeout(() => makeMove(chess, board), 250);
     }
 },
   onSnapEnd: () => {
-    board.position(game.fen());
-    document.querySelector('#fen').innerText = game.fen();
-    document.querySelector('#pgn').innerText = game.pgn();
+    board.position(chess.fen());
+    document.querySelector('#fen').innerText = chess.fen();
+    document.querySelector('#pgn').innerText = chess.pgn();
   }
 });

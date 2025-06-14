@@ -35,25 +35,27 @@ function sortMove(moves) {
 }
 function quiescenceSearch(game, alpha, beta, depth = 5) {
   if (depth <= 0 || game.isGameOver()) return evaluate(game);
-  const standPat = evaluate(game);
+  const standPat = evaluate(game); // in case there are no captures
 
-  if (standPat >= beta) return beta;
-  if (standPat > alpha) alpha = standPat;
+  if (standPat >= beta) return beta; // if stand pat < beta, return beta as the lower bound
+  if (standPat > alpha) alpha = standPat; // if stand pat > alpha, update alpha as the upper bound
 
   const captures = game.moves({ verbose: true }).filter(
     move => move.flags.includes('c') || move.flags.includes('e') || move.san.includes('+')
-  );
+  ); // filtering captures(including en passant) and checks
 
   for (const move of captures) {
     game.move(move);
+    // continue searching even if the depth reached 0 to ensure the position is quiet
+    // negate for negamax
     const score = -quiescenceSearch(game, -beta, -alpha, depth - 1);
     game.undo();
 
-    if (score >= beta) return beta;
-    if (score > alpha) alpha = score;
+    if (score >= beta) return beta; // same as above, returning lower bound
+    if (score > alpha) alpha = score; // same as above, updating upper bound 
   }
 
-  return alpha;
+  return alpha; // return the best score found
 }
 // transposition table helper func
 function getTranspositionKey(game) {
@@ -61,19 +63,21 @@ function getTranspositionKey(game) {
 }
 
 // negamax + alpha-beta pruning + sorting moves
+// for some reason this is working very slowly, even with all the optimizations
+// im trying to figure out why
 const transpositionTable = new Map();
 function negamax(game, depth, alpha=-Infinity, beta=Infinity) {
   const key = getTranspositionKey(game);
-  if (transpositionTable.has(key)) { // if position is evaluated b4
-    const entry = transpositionTable.get(key);
+  if (transpositionTable.has(key)) { // if position is evaluated before
+    const entry = transpositionTable.get(key); // collect data
     if (entry.depth >= depth) {
       posEvaluated++;
       return entry.evaluation; // return cached eval
     }
   }
-  if (depth === 0 || game.isGameOver()) {
+  if (depth === 0 || game.isGameOver()) { // depth reached / game over, return eval immediately
     const evaluation = quiescenceSearch(game, alpha, beta);
-    transpositionTable.set(key, { evaluation: evaluation, depth });
+    transpositionTable.set(key, { evaluation: evaluation, depth }); // store data
     return evaluation
   }
 
@@ -90,7 +94,7 @@ function negamax(game, depth, alpha=-Infinity, beta=Infinity) {
     alpha = Math.max(alpha, evaluation);
     if (alpha >= beta) break;
   }
-  transpositionTable.set(key, { eval: maxEval, depth });
+  transpositionTable.set(key, { eval: maxEval, depth }); // store data
   return maxEval;
 }
 
@@ -106,6 +110,7 @@ export function findBestMove(game) {
   // check whose turn it is
   let bestEval = game.turn() === 'w' ? -Infinity : Infinity;
   
+  // THIS FOR LOOP IS THE MAIN ISSUE FOR SLOW PERFORMANCE
   for (let move of moves) {
     game.move(move);
     let evaluation = negamax(game, 2, -1); // second param is depth
@@ -113,8 +118,7 @@ export function findBestMove(game) {
     
     console.log(`Evaluation of ${move.san}: ${evaluation}`);
     
-    // white wants max, black wants min
-    if (game.turn() === 'w' ? (evaluation > bestEval) : (evaluation < bestEval)) {
+    if (evaluation < bestEval) { // for black
       bestEval = evaluation;
       bestMove = move;
     }
@@ -136,6 +140,7 @@ export function makeMove(game, board) {
   if (move) {
     game.move(move);
     board.position(game.fen());
+    // game != board
     document.querySelector('#fen').innerText = game.fen();
     document.querySelector('#pgn').innerText = game.pgn();
   }
