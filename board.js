@@ -6,7 +6,7 @@ const chess = new Chess();
 const board = Chessboard('board', {
   draggable: true,
   position: 'start',
-  animation: 0,
+  animation: false,
   onDragStart: (source, piece, position, orientation) => {
     if (chess.isGameOver()) return false;
     // Only allow dragging of white pieces
@@ -22,7 +22,7 @@ const board = Chessboard('board', {
        (piece.color === 'b' && target[1] === '1'))
     ) {
       moveConfig.promotion = 'q';
-    }
+    } // auto promote to queen
     let move;
     try {
         move = chess.move(moveConfig);
@@ -33,7 +33,7 @@ const board = Chessboard('board', {
     if (!move) return 'snapback';
 
     // Update board and info after a legal move
-    board.position(chess.fen());
+    board.position(chess.fen(), false);
     document.querySelector('#fen').innerText = chess.fen();
     document.querySelector('#pgn').innerText = chess.pgn();
 

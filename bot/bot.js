@@ -2,7 +2,6 @@ import { Chess } from 'https://esm.sh/chess.js';
 import { evaluate } from './evaluate.js';
 
 const chess = new Chess()
-let posEvaluated = 0; // Keep this global
 // presorting moves
 function sortMove(move) {
   const pieceValues = { // idk why i need 2
@@ -27,9 +26,8 @@ function sortMove(move) {
     score += 10 * capturedPiece - capturingPiece;
   }
 
-  if (move.flags.includes('c')) score += 50; // check
-  if (move.flags.includes('k')) score += 20; // kingside castling
-  if (move.flags.includes('q')) score += 20; // queenside castling
+  if (move.san.includes('+')) score += 30; // check
+  if (move.san.includes('O-O')) score += 20; // kingside castling
   if (move.san.includes('#')) score += 2147483647; // checkmate lol
 
   // if (moves.san === "Rb8") score -= 2147483647 // ok dude this is not fun at all
@@ -59,15 +57,12 @@ function quiescenceSearch(game, alpha, beta, depth = 5) {
   return alpha; // return the best score found
 }
 
-// negamax + alpha-beta pruning + sorting moves
-// for some reason this is working very slowly, even with all the optimizations
-// im trying to figure out why
-const transpositionTable = new Map();
-const depthLimit = 3;
+const transpositionTable = new Map(); // map is op
 let bestMove = null;
 
 // Optimizations: Negamax, Alpha-beta pruning, quiescence search, transposition table
-function negamax(game, depth = depthLimit, alpha = -Infinity, beta = Infinity) {
+let posEvaluated = 0; // Keep this global
+function negamax(game, depthLimit, depth = depthLimit, alpha = -Infinity, beta = Infinity) {
   const key = game.hash(); // wtf i remember implemented this before
   if (transpositionTable.has(key)) { // if the position is evaluated before, return instantly
     const entry = transpositionTable.get(key);
@@ -78,20 +73,34 @@ function negamax(game, depth = depthLimit, alpha = -Infinity, beta = Infinity) {
   }
 
   if (depth === 0 || game.isGameOver()) {
-    const evaluation = quiescenceSearch(game, alpha, beta);
+    const evaluation = quiescenceSearch(game, alpha, beta); // continue searching for captures
     transpositionTable.set(key, { evaluation: evaluation, depth });
     return evaluation;
   }
 
+  const DEPTH_REDUCTION_VALUE = 2;
+  if (!game.isCheck() && depth >= DEPTH_REDUCTION_VALUE + 1){
+    game.setTurn('w'); // because the bot only plays as black
+    const evaluation = -negamax(game, depthLimit, depth - 1 - DEPTH_REDUCTION_VALUE, -beta, -alpha);
+    game.setTurn('b');
+    if (evaluation > beta){
+      return beta; // beta cutoff
+    }
+  }
   let maxEval = -Infinity;
   const moves = game.moves({ verbose: true });
   const sortedMoves = moves.sort((a, b) => sortMove(b) - sortMove(a));
 
+  // mate check
+  const CHECKMATE_SCORE = -2147483647
+  if (game.isCheckmate()){return CHECKMATE_SCORE + depth;} // mate in 4 is better than mate in 1, so we increase score by depth
+
+  // main search loop
   for (const move of sortedMoves) {
     game.move(move);
     posEvaluated++;
-    const evaluation = -negamax(game, depth - 1, -beta, -alpha); // negate for negamax
-    if (depth === depthLimit) console.log(`Move: ${move.san}, Eval: ${evaluation}`);
+    const evaluation = -negamax(game, depthLimit, depth - 1, -beta, -alpha); // negate for negamax
+    if (depth === depthLimit) console.log(`Depth: ${depth}, Move: ${move.san}, Eval: ${evaluation}`);
     game.undo();
 
     if (evaluation > maxEval) {
@@ -110,21 +119,28 @@ function negamax(game, depth = depthLimit, alpha = -Infinity, beta = Infinity) {
 }
 
 // not again another function
-function iterativeDeepening(game, maxDepth = 3, timeLimit = 6942){
-  
+function iterativeDeepening(game, maxDepth, timeLimit = 5000){
+  let start = performance.now()
+  let localBestMove = null;
+  for (let depth = 1; depth <= maxDepth; depth++){
+    if (performance.now() - start > timeLimit) break; // stop if time limit exceeded
+    negamax(game, depth)
+    localBestMove = bestMove;
+  }
+  return localBestMove
 }
 
 // finding best move
 export function makeMove(game, board) {
-  posEvaluated = 0;
-  bestMove = null;
-
-  const startTime = performance.now();
-  const evaluation = negamax(game, depthLimit);
-  const timeElapsed = performance.now() - startTime;
+  const start = performance.now();
+  let depth = 3
+  bestMove = iterativeDeepening(game, depth, 5000);
+  const evaluation = negamax(game, depth)
+  const timeElapsed = performance.now() - start;
   const speed = timeElapsed > 0 ? Math.round(posEvaluated / (timeElapsed / 1000)) : posEvaluated;
 
   // Debug info
+  document.querySelector('#ply').textContent = `Depth: ${depth}`;
   document.querySelector('#positions').textContent = `Positions evaluated: ${posEvaluated}`;
   document.querySelector('#time').textContent = `Time: ${timeElapsed.toFixed(2)}ms`;
   document.querySelector('#speed').textContent = `Speed: ${speed.toLocaleString()} pos/sec`;
@@ -132,7 +148,7 @@ export function makeMove(game, board) {
 
   if (bestMove) {
     game.move(bestMove);
-    board.position(game.fen());
+    board.position(game.fen(), false);
     document.querySelector('#fen').innerText = game.fen();
     document.querySelector('#pgn').innerText = game.pgn();
   }
