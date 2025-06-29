@@ -1,0 +1,30 @@
+body {
+  font-family: monospace;
+  background-color: #111;
+  color: #eee;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0;
+  padding: 1rem;
+}
+
+#board {
+  margin-top: 1rem;
+  box-shadow: 0 0 20px #a9a9a9;
+}
+
+button, select {
+  font-family: monospace;
+  margin: 0.7rem;
+  padding: 0.7rem 1rem;
+  background: #333;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 0 5px #a9a9a9;
+}
+button:hover {
+  background: #555;
+}

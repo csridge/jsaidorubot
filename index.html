@@ -3,8 +3,11 @@
         <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
         <script src="./lib/chessboard-1.0.0.min.js"></script>
         <link rel="stylesheet" href="./lib/chessboard-1.0.0.min.css">
+        <link rel="stylesheet" href="./style.css">
     </head>
     <body>
+        <div id="pgn"></div>
+        <div id="fen">Game FEN: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 0</div>
         <div id="board" style="width: 400px"></div>
         <button id="startBtn">Start Position</button>
         <button id="clearBtn">Clear Board</button>
@@ -14,8 +17,6 @@
             <div id="time">Time: 0ms</div>
             <div id="speed">Speed: 0 pos/sec</div>
         </div>
-        <div id="pgn"></div>
-        <div id="fen"></div>
         <div id="eval"></div>
         <script type="module" src="./board.js"></script>
         <script type="module" src="./bot/bot.js"></script>

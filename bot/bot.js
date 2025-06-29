@@ -15,12 +15,12 @@ function sortMove(move) {
   let score = 0;
 
   // Promotion bonus
-  if (move.promotion) {
+  if (move.isPromotion()) {
     score += pieceValues[move.promotion] || 0;
   }
 
   // MVV-LVA (Most Valuable Victim - Least Valuable Attacker)
-  if (move.captured) {
+  if (move.isCapture() || move.isEnPassant()) {
     const capturedPiece = pieceValues[move.captured];
     const capturingPiece = pieceValues[move.piece];
     score += 10 * capturedPiece - capturingPiece;
@@ -28,40 +28,50 @@ function sortMove(move) {
 
   if (move.san.includes('+')) score += 30; // check
   if (move.san.includes('O-O')) score += 20; // kingside castling
-  if (move.san.includes('#')) score += 2147483647; // checkmate lol
+  if (move.san.includes('#')) score += 32768; // checkmate
 
   // if (moves.san === "Rb8") score -= 2147483647 // ok dude this is not fun at all
   return score;
 }
-function quiescenceSearch(game, alpha, beta, depth = 5) {
-  if (depth <= 0 || game.isGameOver()) return evaluate(game);
-  const standPat = evaluate(game); // in case there are no captures
-  if (standPat >= beta) return beta; // if stand pat < beta, return beta as the lower bound
-  if (standPat > alpha) alpha = standPat; // if stand pat > alpha, update alpha as the upper bound
+function quiescenceSearch(game, alpha, beta) {
+  if (game.isCheckmate()) return 2147483647;
+  if (game.isDraw()) return 0;
+  const standPat = evaluate(game);
+  let bestValue = standPat;
+  if (bestValue >= beta) return bestValue; // beta cutoff
+  if (bestValue > alpha) alpha = bestValue; // update alpha
 
-  const captures = game.moves({ verbose: true }).filter(
-    move => move.flags.includes('c') || move.flags.includes('e')
-  ); // filtering captures(including en passant) and checks
-
-  for (const move of captures) {
-    game.move(move);
-    // continue searching even if the depth reached 0 to ensure the position is quiet
-    // negate for negamax
-    const score = -quiescenceSearch(game, -beta, -alpha, depth - 1);
+  const moves = game.moves({ verbose: true })
+  const captures = moves.filter(
+  move => move.flags.includes('c') || move.flags.includes('e')) // filtering captures and en passant
+  if (captures.length === 0) return standPat; // if no capture, return static eval
+  for (let capture of captures){
+    game.move(capture);
+    let evaluation = -quiescenceSearch(game, -beta, -alpha); // negate for negamax
     game.undo();
-
-    if (score >= beta) return beta; // same as above, returning lower bound
-    if (score > alpha) alpha = score; // same as above, updating upper bound 
+    if (evaluation >= beta) return beta; // beta cutoff
+    if (evaluation > bestValue) bestValue = evaluation; // update best eval
+    if (evaluation > alpha) alpha = evaluation; // update alpha
   }
-
-  return alpha; // return the best score found
+  return bestValue;
 }
 
 const transpositionTable = new Map(); // map is op
 let bestMove = null;
 
-// Optimizations: Negamax, Alpha-beta pruning, quiescence search, transposition table
 let posEvaluated = 0; // Keep this global
+
+let historyTable = new Array(64)
+for (let i = 0; i < historyTable.length; i++){
+  historyTable[i] = new Array(64).fill(0)
+}
+
+function squareToIndex(square){
+  const fileIndex = square.charCodeAt(0) - 'a'.charCodeAt(0);
+  const rankIndex = 8 - parseInt(square[1], 10);
+  return rankIndex * 8 + fileIndex;
+}
+// Optimizations: Negamax, Alpha-beta pruning, quiescence search, transposition table
 function negamax(game, depthLimit, depth = depthLimit, alpha = -Infinity, beta = Infinity) {
   const key = game.hash(); // wtf i remember implemented this before
   if (transpositionTable.has(key)) { // if the position is evaluated before, return instantly
@@ -77,24 +87,14 @@ function negamax(game, depthLimit, depth = depthLimit, alpha = -Infinity, beta =
     transpositionTable.set(key, { evaluation: evaluation, depth });
     return evaluation;
   }
-
-  const DEPTH_REDUCTION_VALUE = 2;
-  if (!game.isCheck() && depth >= DEPTH_REDUCTION_VALUE + 1){
-    game.setTurn('w'); // because the bot only plays as black
-    const evaluation = -negamax(game, depthLimit, depth - 1 - DEPTH_REDUCTION_VALUE, -beta, -alpha);
-    game.setTurn('b');
-    if (evaluation > beta){
-      return beta; // beta cutoff
-    }
-  }
   let maxEval = -Infinity;
   const moves = game.moves({ verbose: true });
   const sortedMoves = moves.sort((a, b) => sortMove(b) - sortMove(a));
 
   // mate check
-  const CHECKMATE_SCORE = -2147483647
+  const CHECKMATE_SCORE = -32768;
   if (game.isCheckmate()){return CHECKMATE_SCORE + depth;} // mate in 4 is better than mate in 1, so we increase score by depth
-
+  if (game.isDraw()) return 0;
   // main search loop
   for (const move of sortedMoves) {
     game.move(move);
@@ -111,7 +111,14 @@ function negamax(game, depthLimit, depth = depthLimit, alpha = -Infinity, beta =
     }
 
     alpha = Math.max(alpha, evaluation);
-    if (alpha >= beta) break;
+    if (alpha >= beta){
+      if (!game.isCapture(move)){
+        let from = squareToIndex(move.from);
+        let to = squareToIndex(move.to);
+        historyTable[from][to] += depth * depth; // history heuristic
+      }
+      break;
+    }
   }
 
   transpositionTable.set(key, { evaluation: maxEval, depth });
@@ -144,12 +151,12 @@ export function makeMove(game, board) {
   document.querySelector('#positions').textContent = `Positions evaluated: ${posEvaluated}`;
   document.querySelector('#time').textContent = `Time: ${timeElapsed.toFixed(2)}ms`;
   document.querySelector('#speed').textContent = `Speed: ${speed.toLocaleString()} pos/sec`;
-  document.querySelector('#eval').textContent = `Eval: ${evaluation}`;
+  document.querySelector('#eval').textContent = `Eval: ${evaluation/100} (pawns)`;
 
   if (bestMove) {
     game.move(bestMove);
     board.position(game.fen(), false);
-    document.querySelector('#fen').innerText = game.fen();
+    document.querySelector('#fen').innerText = `Game FEN: ${game.fen()}`;
     document.querySelector('#pgn').innerText = game.pgn();
   }
 }

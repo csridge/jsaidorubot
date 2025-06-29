@@ -107,37 +107,46 @@ function isEndgame(whiteScore, blackScore){
                                           // 13 points of material(in this case 1300 centipawns)
                                           // 1300 + 1300 = 2600 centipawns
 }
+
+// maybe this isnt neccessary yet...
+// function setKingPST(board){
+//   let whiteMaterial = 0; // these two variables is for pure material evaluation(no psts)
+//   let blackMaterial = 0; // read above
+// 
+//   for (let idx = 0; idx < SQUARES.length; idx++) {
+//       let square = SQUARES[idx];
+//       let piece = board.get(square);
+//       if (!piece || piece.type === "k") continue; // skip empty squares
+//       let val = piece_vals[piece.type]
+// 
+//       if (piece.color === 'w'){
+//         whiteMaterial += val;
+//       }
+//       else if (piece.color === 'b'){
+//         blackMaterial += val;
+//       }
+//   }
+//  
+//   if (isEndgame(whiteMaterial, blackMaterial)){
+//     psts['k'] = kingEndgamePST;
+//   }
+//   else {
+//     psts['k'] = originalKingPST
+//   }
+//   return 0;
+// }
 export function evaluate(board){
+  if (board.isCheckmate()) return 2147483647;
+  if (board.isDraw()) return 0;
   let white = 0; // white score with PSTs included
   let black = 0; // black score with PSTs included
-  let whiteMaterial = 0; // these two variables is for pure material evaluation(no psts)
-  let blackMaterial = 0; // read above
-
-  // 1st pass: calculate pure material
+  // setKingPST(board);
   for (let idx = 0; idx < SQUARES.length; idx++) {
       let square = SQUARES[idx];
       let piece = board.get(square);
       if (!piece) continue; // skip empty squares
-      let val = piece_vals[piece.type]
-
-      if (piece.color === 'w'){
-        whiteMaterial += val;
-      }
-      else if (piece.color === 'b'){
-        blackMaterial += val;
-      }
-  }
-  
-  if (isEndgame(whiteMaterial, blackMaterial)){
-    psts['k'] = kingEndgamePST;
-  }
-  // 2nd pass: calculate score(with psts)
-  for (let idx = 0; idx < SQUARES.length; idx++) {
-      let square = SQUARES[idx];
-      let piece = board.get(square);
-      if (!piece || piece.type === "k") continue; // skip empty squares
       let index = piece.color === 'w' ? idx : 63 - idx;
-      let val = piece_vals[piece.type] + psts[piece.type][index];
+      let val = piece_vals[piece.type] + psts[piece.type][index]; 
 
       if (piece.color === 'w'){
         white += val;
@@ -146,7 +155,6 @@ export function evaluate(board){
         black += val;
       }
   }
-  psts['k'] = originalKingPST; // reset king pst to original one
   return white - black;
 }
 
