@@ -112,7 +112,6 @@ function isEndgame(whiteScore, blackScore){
 // function setKingPST(board){
 //   let whiteMaterial = 0; // these two variables is for pure material evaluation(no psts)
 //   let blackMaterial = 0; // read above
-// 
 //   for (let idx = 0; idx < SQUARES.length; idx++) {
 //       let square = SQUARES[idx];
 //       let piece = board.get(square);
